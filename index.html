@@ -60,6 +60,10 @@
       </dl>
       <label class="field"><span data-t="cam.pick"></span> <select id="camSel" style="max-width:200px"><option value=""></option></select></label>
       <label class="check"><input type="checkbox" id="skeleton" checked> <span data-t="skeleton.show"></span></label>
+      <label class="field"><span data-t="orient.rot"></span> <select id="rotSel"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></label>
+      <label class="check"><input type="checkbox" id="flipH"> <span data-t="orient.fh"></span></label>
+      <label class="check"><input type="checkbox" id="flipV"> <span data-t="orient.fv"></span></label>
+      <p class="hint" data-t="orient.hint"></p>
       <button class="wide gap" id="stopBtn" style="display:none" data-t="cam.stop" data-t-title="cam.stopTitle"></button>
     </section>
 
@@ -123,7 +127,7 @@
 <script type="module">
 import {
   Engine, Rate, render, cleanCrop, loadSettings, saveSettings, settingsToHash,
-  tensionPercent, tiltSide, validRange, GLOW_START,
+  tensionPercent, tiltSide, validRange, GLOW_START, orientFrame, mirrorRange,
 } from "./handlab.js";
 import { openSource, listCameras } from "./source.js";
 import { LANGS, setLang, getLang, t, applyI18n } from "./i18n.js";
@@ -205,6 +209,26 @@ $("skeleton").checked = settings.skeleton !== false;
 $("gaugeOn").checked = settings.gauge !== false;
 $("skeleton").onchange = (e) => { settings.skeleton = e.target.checked; persist(); };
 $("gaugeOn").onchange = (e) => { settings.gauge = e.target.checked; persist(); };
+/* 映像の向き：回してから裏返す。解析も描画も、向きを直した後の映像の上で行う */
+const orientCanvas = document.createElement("canvas");
+$("rotSel").value = String(settings.orient.rot);
+$("flipH").checked = settings.orient.fh;
+$("flipV").checked = settings.orient.fv;
+$("rotSel").onchange = (e) => {
+  settings.orient = { ...settings.orient, rot: Number(e.target.value) };
+  settings.crop = { l: 0, t: 0, r: 0, b: 0 };  // 縦横が変わるので、映す範囲は全体に戻す
+  placeBox(); persist();
+};
+// 裏返したら、映す範囲も同じ向きに裏返す。鏡像になると手首の角度の正負が逆になるので、可動域も入れ替える
+const flip = (key, a, b) => (e) => {
+  settings.orient = { ...settings.orient, [key]: e.target.checked };
+  const c = settings.crop;
+  settings.crop = { ...c, [a]: c[b], [b]: c[a] };
+  settings.range = mirrorRange(settings.range);
+  placeBox(); persist();
+};
+$("flipH").onchange = flip("fh", "l", "r");
+$("flipV").onchange = flip("fv", "t", "b");
 $("obsUrl").onfocus = (e) => e.target.select();
 $("obsCopy").onclick = async () => {
   try { await navigator.clipboard.writeText($("obsUrl").value); } catch (e) { $("obsUrl").select(); document.execCommand("copy"); }
@@ -276,7 +300,8 @@ async function start() {
       setCover("cover.stopped");
       return;
     }
-    const frame = await state.source.next();
+    const raw = await state.source.next();
+    const frame = orientFrame(orientCanvas, raw.image, raw.width, raw.height, settings.orient);
     let res = null;
     try { res = await engine.analyze(frame.image, frame.width, frame.height); } catch (e) { /* 1 コマ失敗しても続ける */ }
     rate.tick();
@@ -289,7 +314,7 @@ async function start() {
     render($("view"), frame.image, frame.width, frame.height, res, { skeleton: settings.skeleton, tension: state.tension, side });
     showStatus(res);
     $("stCam").title = state.source.info();
-    if (frame.release) frame.release();
+    if (raw.release) raw.release();
   }
 }
 $("startBtn").onclick = start;

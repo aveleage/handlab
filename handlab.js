@@ -177,6 +177,46 @@ export class Engine {
   }
 }
 
+// ---- 映像の向き ----
+// カメラの置き方に合わせて、映像を回したり裏返したりする。OBS 側で裏返すとゲージや赤い縁まで裏返るので、ここで映像だけを直す。
+// 向きを直した映像を「元の映像」として、以降の解析も描画もすべてその上で行う（骨格・切り抜き・赤い縁が自然にそろう）。
+
+/** 向き {rot: 0|90|180|270（時計回り）, fh: 左右反転, fv: 上下反転} を、決まった形にそろえる。回してから裏返す。 */
+export function cleanOrient(o) {
+  const rot = ((Math.round(Number(o && o.rot) / 90) * 90) % 360 + 360) % 360 || 0;
+  return { rot, fh: !!(o && o.fh), fv: !!(o && o.fv) };
+}
+
+/** 向きを直す必要があるか。 */
+export const isOriented = (o) => !!(o && (o.rot || o.fh || o.fv));
+
+/** 鏡像になっているか（左右か上下の片方だけ反転）。鏡像では、手首の角度の正負が逆になる。 */
+export const isMirrored = (o) => !!(o && o.fh !== o.fv);
+
+/**
+ * 映像の向きを直して canvas に描き、{ image, width, height } を返す。直す必要が無ければ、元の映像をそのまま返す。
+ * canvas は呼ぶ側が 1 枚用意して使い回す。
+ */
+export function orientFrame(canvas, image, width, height, orient) {
+  const o = cleanOrient(orient);
+  if (!isOriented(o)) return { image, width, height };
+  const side = o.rot === 90 || o.rot === 270;
+  const w = side ? height : width, h = side ? width : height;
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.translate(w / 2, h / 2);
+  ctx.scale(o.fh ? -1 : 1, o.fv ? -1 : 1);
+  ctx.rotate((o.rot * Math.PI) / 180);
+  ctx.drawImage(image, -width / 2, -height / 2, width, height);
+  return { image: canvas, width: w, height: h };
+}
+
+/** 鏡像に切り替えた（または戻した）ときの可動域。角度の正負が逆になるので、上下を入れ替えて符号を返す。 */
+export function mirrorRange(r) {
+  return r ? { min: -r.max, neutral: -r.neutral, max: -r.min } : null;
+}
+
 /** 切り抜き {l, t, r, b}（各辺から落とす割合）を、決まった範囲にそろえる。 */
 export function cleanCrop(c) {
   const v = (x) => (Number.isFinite(Number(x)) ? Math.max(0, Math.min(0.95, Number(x))) : 0);
@@ -242,14 +282,14 @@ export function render(canvas, source, width, height, result, opts = {}) {
 const STORE_KEY = "handlab.v1";
 const OLD_STORE_KEY = "aimhand.v1"; // 改名前（AimHand）の保存先。新しいほうが無ければ、こちらを読む
 // lang は画面の言語（"" なら、ブラウザの言語に合わせる）。theme は見た目（"" と "dark" は黒基調、"light" は明るい色）
-export const DEFAULT_SETTINGS = { range: null, crop: { l: 0, t: 0, r: 0, b: 0 }, skeleton: true, gauge: true, camera: "", lang: "", theme: "" };
+export const DEFAULT_SETTINGS = { range: null, crop: { l: 0, t: 0, r: 0, b: 0 }, skeleton: true, gauge: true, camera: "", lang: "", theme: "", orient: { rot: 0, fh: false, fv: false } };
 
 export function loadSettings() {
   let saved = {};
   try {
     saved = JSON.parse(localStorage.getItem(STORE_KEY) || localStorage.getItem(OLD_STORE_KEY) || "{}") || {};
   } catch (e) { /* 壊れていたら初期値 */ }
-  return { ...DEFAULT_SETTINGS, ...saved, range: validRange(saved.range), crop: cleanCrop(saved.crop) };
+  return { ...DEFAULT_SETTINGS, ...saved, range: validRange(saved.range), crop: cleanCrop(saved.crop), orient: cleanOrient(saved.orient) };
 }
 
 export function saveSettings(settings) {
@@ -266,6 +306,8 @@ export function settingsToHash(s) {
   if (s.skeleton === false) parts.push("s=0");
   if (s.gauge === false) parts.push("g=0");
   if (s.camera) parts.push("cam=" + encodeURIComponent(s.camera));
+  const o = cleanOrient(s.orient);
+  if (isOriented(o)) parts.push(`o=${o.rot},${o.fh ? 1 : 0},${o.fv ? 1 : 0}`);  // 向き：回転（度）, 左右反転, 上下反転
   if (s.lang) parts.push("l=" + encodeURIComponent(s.lang));
   return parts.join("&");
 }
@@ -279,6 +321,7 @@ export function settingsFromHash(hash, base = DEFAULT_SETTINGS) {
   if (q.has("s")) out.skeleton = q.get("s") !== "0";
   if (q.has("g")) out.gauge = q.get("g") !== "0";
   if (q.has("cam")) out.camera = q.get("cam");
+  if (q.has("o")) { const [rot, fh, fv] = q.get("o").split(","); out.orient = cleanOrient({ rot: Number(rot), fh: fh === "1", fv: fv === "1" }); }
   if (q.has("l")) out.lang = q.get("l");
   return out;
 }

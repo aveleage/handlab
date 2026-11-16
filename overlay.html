@@ -46,7 +46,7 @@
   <div id="msg"></div>
 </div>
 <script type="module">
-import { Engine, render, loadSettings, settingsFromHash, tensionPercent, tiltSide, GLOW_START } from "./handlab.js";
+import { Engine, render, loadSettings, settingsFromHash, tensionPercent, tiltSide, GLOW_START, orientFrame } from "./handlab.js";
 import { openSource } from "./source.js";
 import { setLang, t } from "./i18n.js";
 
@@ -96,8 +96,10 @@ async function start() {
     }
   }
   say("");
+  const orientCanvas = document.createElement("canvas");
   for (;;) {
-    const frame = await source.next();
+    const raw = await source.next();
+    const frame = orientFrame(orientCanvas, raw.image, raw.width, raw.height, settings.orient);  // 向きを直してから解析する
     let res = null;
     try { res = await engine.analyze(frame.image, frame.width, frame.height); } catch (e) { /* 1 コマ失敗しても続ける */ }
     const range = settings.range;
@@ -106,7 +108,7 @@ async function start() {
     render($("view"), frame.image, frame.width, frame.height, res, { crop: settings.crop, skeleton: settings.skeleton, tension, side });
     showGauge(tension);
     $("wrap").style.setProperty("--ar", $("view").width / $("view").height);
-    if (frame.release) frame.release();
+    if (raw.release) raw.release();
   }
 }
 start();
