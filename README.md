@@ -62,6 +62,7 @@ HandLab は、ウェブカメラでマウスを握る手を映すと、手首の
 3. 数分後に `https://aveleage.github.io/handlab/` で開ける。
 
 - `.nojekyll` は、GitHub Pages にファイルをそのまま出させるための空のファイルです（消さない）。
+- 訪問の回数は GoatCounter（`racran.goatcounter.com`、Cookie なし）で数えています。タグは `index.html` にだけあり、OBS 用のページとライセンスのページでは数えません。`localhost` では数えません。
 - 開発用の入力（`?frames=`）は、`localhost` で開いたときだけ有効です。公開サイトでは無視します。
 - アドレスが変わると、OBS 用の URL と、ブラウザに保存した設定は引き継がれません（アドレスごとに別物）。独自ドメインに移るときは、利用者に URL の貼り直しを案内します。
 - モデルを学習し直したら、`models/armnet.onnx` を `site/models/` にコピーし直します。
