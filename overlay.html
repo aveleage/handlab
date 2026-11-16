@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HandLab overlay</title>
+<!--
+  OBS に載せるための表示だけのページ。手元の映像（骨格・前腕の線・テンションの赤い縁つき）と、テンションのゲージを出す。
+  背景は透明。設定（可動域・映す範囲・言語など）は URL の # 以降に入っている。操作画面の「OBS 用の URL」をそのまま使う。
+
+  使い方は 2 通り:
+   1. ふつうのブラウザでこのページを開き、OBS の「ウィンドウキャプチャ」で映す
+   2. OBS をカメラ許可つきで起動して、「ブラウザ」ソースにこの URL を入れる
+-->
+<style>
+  :root { --num: Bahnschrift, "DIN Alternate", "Roboto Condensed", "Arial Narrow", sans-serif; --body: "Segoe UI", system-ui, sans-serif; }
+  :lang(ja) { --body: "Yu Gothic UI", "Hiragino Sans", Meiryo, sans-serif; }
+  :lang(zh-Hans) { --body: "Microsoft YaHei UI", "PingFang SC", sans-serif; }
+  :lang(ko) { --body: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
+  html, body { margin: 0; background: transparent; overflow: hidden; color: #fff; }
+  /* 映像は、ソース（窓）の幅と高さの両方に収まる大きさにする。範囲を変えて縦長になっても、下のゲージが切れないように */
+  #wrap { position: relative; width: min(100vw, calc(100vh * var(--ar, 1.7778))); }
+  #view { display: block; width: 100%; }
+  /* ゲージ：中央が 0%、左端が −100%、右端が +100%。±50% より外は赤 */
+  #gaugeBox { position: absolute; left: 4%; right: 4%; bottom: 4%; display: none; align-items: center; gap: 12px;
+    text-shadow: 0 0 4px #000, 0 0 2px #000; }
+  #gauge { position: relative; flex: 1; height: 12px; background: rgba(0, 0, 0, .6); border-radius: 2px; overflow: hidden;
+    outline: 1.5px solid rgba(255, 255, 255, .75); }
+  #gauge i { position: absolute; top: 0; bottom: 0; width: 1.5px; background: rgba(255, 255, 255, .6); }
+  #fill { position: absolute; top: 0; bottom: 0; left: 50%; width: 0; background: #fff; }
+  #num { min-width: 92px; text-align: right; font: 600 26px/1 var(--num); font-stretch: 80%; font-variant-numeric: tabular-nums; }
+  #msg { position: absolute; left: 0; right: 0; top: 0; padding: 14px 18px; font: 15px/1.6 var(--body);
+    background: rgba(19, 35, 45, .94); color: #e6edf1; display: none; }
+  #msg b { color: #fff; }
+  #msg small { color: #b4c2cc; }
+  #msg code { font: 13px Consolas, monospace; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="view"></canvas>
+  <div id="gaugeBox">
+    <div id="gauge"><div id="fill"></div><i style="left:25%"></i><i style="left:50%"></i><i style="left:75%"></i></div>
+    <span id="num"></span>
+  </div>
+  <div id="msg"></div>
+</div>
+<script type="module">
+import { Engine, render, loadSettings, settingsFromHash, tensionPercent, tiltSide, GLOW_START } from "./handlab.js";
+import { openSource } from "./source.js";
+import { setLang, t } from "./i18n.js";
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const say = (html) => { $("msg").innerHTML = html; $("msg").style.display = html ? "block" : "none"; };
+// 設定は、URL の # 以降 → このブラウザに保存したもの の順に使う
+let settings;
+function readSettings() { settings = settingsFromHash(location.hash, loadSettings()); setLang(settings.lang); }
+readSettings();
+addEventListener("hashchange", readSettings);
+addEventListener("storage", readSettings);  // 操作画面で変えたらすぐ反映
+
+function showGauge(tension) {
+  const on = settings.gauge !== false && settings.range;
+  $("gaugeBox").style.display = on ? "flex" : "none";
+  if (!on) return;
+  if (tension == null) { $("fill").style.width = "0"; $("num").textContent = "—"; return; }
+  $("fill").style.left = (tension >= 0 ? 50 : 50 + tension / 2) + "%";
+  $("fill").style.width = Math.abs(tension) / 2 + "%";
+  $("fill").style.background = Math.abs(tension) > GLOW_START ? "#e5342e" : "#fff";
+  $("num").textContent = (tension > 0 ? "+" : "") + Math.round(tension) + " %";
+}
+
+async function start() {
+  say(esc(t("ov.loading")));
+  let engine, source;
+  try {
+    engine = await Engine.create({ onProgress: (k) => k && say(esc(t("cover." + k))) });
+  } catch (e) {
+    return say(`<b>${esc(t("ov.modelFail"))}</b><br><small>${esc(e.message || e)}</small>`);
+  }
+  // 開けなかったら、3 秒ごとに試し直す（カメラをつなぎ直したときや、他のアプリが放したときに自動で映るように）
+  for (let attempt = 1; !source; attempt++) {
+    try {
+      source = await openSource(settings.camera);
+    } catch (e) {
+      const name = String(e.name || "");
+      if (name === "NotReadableError" || name === "AbortError") {
+        say(`<b>${esc(t("ov.noFrames"))}</b><br><small>${esc(t("ov.retry", { n: attempt, name }))}</small>`);
+      } else if (name === "NotAllowedError" || name === "SecurityError") {
+        say(`<b>${esc(t("ov.denied"))}</b><br>${t("ov.deniedHelp")}<br><small>${esc(name)} ${esc(e.message || "")}</small>`);
+      } else {
+        say(`<b>${esc(t("ov.camFail"))}</b><br><small>${esc(name)} ${esc(e.message || e)}</small>`);
+      }
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
+  say("");
+  for (;;) {
+    const frame = await source.next();
+    let res = null;
+    try { res = await engine.analyze(frame.image, frame.width, frame.height); } catch (e) { /* 1 コマ失敗しても続ける */ }
+    const range = settings.range;
+    const tension = res && res.angle != null && range ? tensionPercent(res.angle, range) : null;
+    const side = tension != null ? tiltSide(res.points[0], res.forearm, tension) : null;
+    render($("view"), frame.image, frame.width, frame.height, res, { crop: settings.crop, skeleton: settings.skeleton, tension, side });
+    showGauge(tension);
+    $("wrap").style.setProperty("--ar", $("view").width / $("view").height);
+    if (frame.release) frame.release();
+  }
+}
+start();
+</script>
+</body>
+</html>

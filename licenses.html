@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HandLab — License and software used</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23f6f8f9'/%3E%3Cpath d='M5 24a11 11 0 0 1 22 0' fill='none' stroke='%2313232d' stroke-width='3'/%3E%3Cpath d='M16 24l6-13' stroke='%23d12f2a' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='24' r='2.6' fill='%2313232d'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wordmark"><a href="./">HandLab</a></div>
+  <p><a href="./" data-t="lic.back"></a></p>
+  <label class="lang"><span data-t="lang.label"></span> <select id="langSel"></select></label>
+</header>
+
+<main class="doc">
+  <div class="sheet">
+    <h1 data-t="lic.title"></h1>
+
+    <h2 data-t="lic.mitTitle"></h2>
+    <p id="mit"></p>
+    <p>Copyright (c) 2026 Racran</p>
+
+    <h2 data-t="lic.loads"></h2>
+    <table>
+      <tr><th data-t="lic.name"></th><th data-t="lic.role"></th><th data-t="lic.license"></th></tr>
+      <tr>
+        <td><a href="https://github.com/google-ai-edge/mediapipe" target="_blank" rel="noopener">MediaPipe Tasks Vision</a> 1.2.3</td>
+        <td data-t="lic.r1"></td>
+        <td>Apache License 2.0</td>
+      </tr>
+      <tr>
+        <td><span data-t="lic.r2n"></span> (<code>hand_landmarker.task</code>)</td>
+        <td data-t="lic.r2"></td>
+        <td>Apache License 2.0</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/microsoft/onnxruntime" target="_blank" rel="noopener">ONNX Runtime Web</a> 1.31.1</td>
+        <td data-t="lic.r3"></td>
+        <td>MIT License</td>
+      </tr>
+      <tr>
+        <td>ArmNet (<code>armnet.onnx</code>)</td>
+        <td data-t="lic.r4"></td>
+        <td data-t="lic.own"></td>
+      </tr>
+    </table>
+    <p data-t="lic.cdn"></p>
+
+    <h2 data-t="lic.trainTitle"></h2>
+    <p id="train"></p>
+
+    <h2 data-t="lic.privacyTitle"></h2>
+    <p data-t="lic.privacy"></p>
+  </div>
+</main>
+
+<script type="module">
+import { loadSettings, saveSettings } from "./handlab.js";
+import { LANGS, setLang, t, applyI18n } from "./i18n.js";
+
+const $ = (id) => document.getElementById(id);
+const settings = loadSettings();
+function show() {
+  applyI18n();
+  document.title = "HandLab — " + t("lic.title");
+  $("mit").innerHTML = t("lic.mit", { a: '<a href="LICENSE.txt">', z: "</a>" });
+  $("train").innerHTML = t("lic.train", { a: '<a href="https://github.com/facebookresearch/sam2" target="_blank" rel="noopener">', z: "</a>" });
+}
+for (const [code, name] of Object.entries(LANGS)) { const o = document.createElement("option"); o.value = code; o.textContent = name; $("langSel").append(o); }
+$("langSel").value = setLang(settings.lang);
+$("langSel").onchange = (e) => { settings.lang = setLang(e.target.value); saveSettings(settings); show(); };
+show();
+</script>
+</body>
+</html>

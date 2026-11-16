@@ -1,0 +1,137 @@
+/* HandLab の見た目。
+   考え方：関節の角度を測る器具（ゴニオメーター）と、実験室の方眼紙。
+   - 主役は半円の計器（テンション）ひとつ。ほかは静かにする
+   - 色は 5 つ：台（方眼紙）、紙、インク、コバルト（操作できるもの）、赤（テンションが高い）
+   - 数字と題字は Bahnschrift（Windows に入っている DIN 系の書体。計器の目盛りの字に近い）。本文は各言語のシステム書体 */
+:root {
+  --bench: #dce3e8;   /* 台 */
+  --sheet: #f6f8f9;   /* 紙 */
+  --ink: #13232d;     /* インク */
+  --soft: #55697a;    /* 補足の字 */
+  --rule: #aebbc4;    /* 罫線 */
+  --blue: #1d4ed8;    /* 操作できるもの */
+  --red: #d12f2a;     /* テンションが高い */
+  --grid: rgba(19, 35, 45, .06);
+  --num: Bahnschrift, "DIN Alternate", "Roboto Condensed", "Arial Narrow", sans-serif;
+  --body: "Segoe UI", system-ui, sans-serif;
+}
+:lang(ja) { --body: "Yu Gothic UI", "Hiragino Sans", Meiryo, sans-serif; }
+:lang(zh-Hans) { --body: "Microsoft YaHei UI", "PingFang SC", "Noto Sans SC", sans-serif; }
+:lang(ko) { --body: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; color: var(--ink); font: 14px/1.65 var(--body);
+  background-color: var(--bench);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+a { color: var(--blue); text-underline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+/* 題字 */
+.top { display: flex; align-items: flex-end; gap: 18px; padding: 18px 24px 14px; flex-wrap: wrap; }
+.wordmark { font: 600 34px/1 var(--num); font-stretch: 80%; letter-spacing: .01em; margin: 0; }
+.wordmark a { color: inherit; text-decoration: none; }
+.top p { margin: 0 0 3px; color: var(--soft); flex: 1; min-width: 200px; }
+.lang { display: flex; align-items: center; gap: 8px; color: var(--soft); margin-bottom: 1px; }
+
+/* 操作するもの */
+button, select, input[type=text] { font: inherit; color: var(--ink); background: var(--sheet); border: 1.5px solid var(--ink); border-radius: 3px; }
+button { padding: 7px 14px; cursor: pointer; }
+button:hover { background: #fff; }
+button.primary { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 600; }
+button.primary:hover { background: #1a43bb; }
+button.big { padding: 13px 22px; font-size: 16px; }
+button.wide { width: 100%; }
+button:disabled { opacity: .5; cursor: default; }
+select { padding: 5px 8px; min-width: 0; }
+input[type=text] { padding: 6px 8px; min-width: 0; }
+input[type=checkbox] { accent-color: var(--blue); width: 16px; height: 16px; margin: 0; }
+code { font: 12.5px/1.5 Consolas, "Cascadia Mono", monospace; background: #e7ecef; padding: 1px 5px; border-radius: 2px; word-break: break-all; }
+
+/* 配置：左に映像、右に 1 枚の紙（計器 → 手順 1・2・3） */
+.bench { display: grid; grid-template-columns: minmax(0, 1fr) 372px; gap: 20px; padding: 0 24px 20px; align-items: start; }
+.bench > div:first-child { position: sticky; top: 12px; }  /* 右の紙を下まで読んでも、映像は見えたままにする */
+@media (max-width: 940px) { .bench { grid-template-columns: 1fr; } .bench > div:first-child { position: static; } }
+.sheet { background: var(--sheet); border: 1.5px solid var(--ink); border-radius: 3px; }
+.sheet > section { padding: 14px 16px 16px; border-top: 1.5px solid var(--ink); }
+.sheet > section:first-child { border-top: 0; }
+.step h2 { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; margin: 0 0 10px; }
+.step h2 .n { font: 600 15px/1 var(--num); width: 24px; height: 24px; border: 1.5px solid var(--ink); border-radius: 50%;
+  display: grid; place-items: center; flex: none; padding-top: 1px; }
+.hint { color: var(--soft); font-size: 12.5px; margin: 8px 0 0; }
+.rows { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; }
+.rows dt { color: var(--soft); }
+.rows dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.field { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.check { display: flex; align-items: center; gap: 8px; margin-top: 10px; cursor: pointer; }
+.gap { margin-top: 12px; }
+.notice { border-left: 4px solid var(--blue); background: #e9eef8; padding: 8px 12px; margin-top: 10px; }
+.notice .hint { margin-top: 4px; }
+.notice .buttons { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.copyrow { display: flex; gap: 6px; margin-top: 6px; }
+.copyrow input { flex: 1; font: 12.5px/1.4 Consolas, monospace; }
+details { margin-top: 10px; border-top: 1px solid var(--rule); padding-top: 8px; }
+summary { cursor: pointer; font-weight: 600; }
+ol { margin: 6px 0 0; padding-left: 22px; }
+ol li { margin: 3px 0; }
+
+/* 計器（テンション） */
+.dial svg { display: block; width: 100%; height: auto; }
+.dial .arc { fill: none; stroke: var(--ink); stroke-width: 3; }
+.dial .arc.hot { stroke: var(--red); stroke-width: 7; }
+.dial .tick { stroke: var(--ink); stroke-width: 1.5; }
+.dial .tick.minor { stroke: var(--soft); stroke-width: 1; }
+.dial text { font: 600 12px var(--num); fill: var(--soft); text-anchor: middle; }
+.dial #needle { transform-origin: 120px 124px; }
+.dial #needle line { stroke: var(--ink); stroke-width: 3; stroke-linecap: round; }
+.dial #needle circle { fill: var(--ink); }
+.dial #needle.idle { opacity: .3; }
+.dial #needle.hot line { stroke: var(--red); }
+.dial #needle.hot circle { fill: var(--red); }
+@keyframes selftest { 0% { transform: rotate(0deg); } 35% { transform: rotate(-80deg); } 75% { transform: rotate(80deg); } 100% { transform: rotate(0deg); } }
+@media (prefers-reduced-motion: no-preference) { .dial #needle.selftest { animation: selftest 1.5s cubic-bezier(.5, 0, .3, 1) .25s both; } }
+.readout { display: flex; align-items: baseline; justify-content: center; gap: 6px; margin-top: 2px; }
+.readout output { font: 600 56px/1 var(--num); font-stretch: 80%; font-variant-numeric: tabular-nums; min-width: 2.6ch; text-align: right; }
+.readout .unit { font: 600 22px/1 var(--num); color: var(--soft); }
+.readout.hot output { color: var(--red); }
+.readout-label { text-align: center; color: var(--soft); margin: 2px 0 10px; }
+
+/* 映像 */
+#stage { position: relative; background: #000; border: 1.5px solid var(--ink); border-radius: 3px; overflow: hidden;
+  aspect-ratio: var(--ar, 1.7778); margin: 0 auto; width: min(100%, calc(max(260px, 100vh - 150px) * var(--ar, 1.7778))); user-select: none; }
+#view { display: block; width: 100%; height: 100%; }
+#cover { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  text-align: center; padding: 24px; background: var(--ink); color: #dbe4ea; }
+#cover p { margin: 0; max-width: 540px; }
+#notes .notice { margin-top: 12px; background: var(--sheet); border: 1.5px solid var(--ink); border-left: 4px solid var(--blue); border-radius: 3px; }
+/* OBS に映す範囲の枠 */
+#cropBox { position: absolute; display: none; outline: 2px solid #fff; box-shadow: 0 0 0 1px #000; cursor: move; touch-action: none; }
+.dim { position: absolute; display: none; background: rgba(0, 0, 0, .6); pointer-events: none; }
+#stage.edit #cropBox, #stage.edit .dim { display: block; }
+#stage.edit { overflow: visible; }  /* 端にある角のつまみが切れないように */
+.hd { position: absolute; background: #fff; border: 1px solid #000; border-radius: 2px; }
+.hd:hover { background: var(--blue); }
+.hd.l, .hd.r { width: 10px; height: 44px; top: calc(50% - 22px); cursor: ew-resize; }
+.hd.t, .hd.b { height: 10px; width: 44px; left: calc(50% - 22px); cursor: ns-resize; }
+.hd.l { left: -6px; } .hd.r { right: -6px; } .hd.t { top: -6px; } .hd.b { bottom: -6px; }
+.hd.nw, .hd.ne, .hd.sw, .hd.se { width: 16px; height: 16px; }
+.hd.nw { left: -9px; top: -9px; cursor: nwse-resize; } .hd.se { right: -9px; bottom: -9px; cursor: nwse-resize; }
+.hd.ne { right: -9px; top: -9px; cursor: nesw-resize; } .hd.sw { left: -9px; bottom: -9px; cursor: nesw-resize; }
+
+/* 下の欄 */
+.foot { padding: 4px 24px 28px; color: var(--soft); font-size: 12.5px; }
+.foot p { margin: 0 0 8px; max-width: 86ch; }
+.foot ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 24px; }
+
+/* 文章のページ（ライセンス） */
+.doc { max-width: 780px; margin: 0 auto; padding: 0 24px 48px; }
+.doc .sheet { padding: 6px 22px 22px; }
+.doc h1 { font-size: 22px; margin: 18px 0 4px; }
+.doc h2 { font-size: 15px; margin: 26px 0 6px; }
+.doc p { margin: 6px 0; }
+.doc table { border-collapse: collapse; width: 100%; }
+.doc th, .doc td { text-align: left; padding: 7px 12px 7px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.doc th { color: var(--soft); font-weight: 600; border-bottom: 1.5px solid var(--ink); }
+.doc pre { white-space: pre-wrap; font: 12.5px/1.6 Consolas, "Cascadia Mono", monospace; background: #e7ecef; padding: 12px 14px; border-radius: 2px; margin: 8px 0 0; }

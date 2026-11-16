@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HandLab — measure wrist tension while you aim</title>
+<meta name="description" data-t-content="page.desc" content="Point a webcam at your mouse hand and see how far your wrist is bent, live. Everything runs in your browser and no video is sent anywhere. Works as an OBS overlay.">
+<meta property="og:title" content="HandLab — measure wrist tension while you aim">
+<meta property="og:description" content="Point a webcam at your mouse hand and see how far your wrist is bent, live. Everything runs in your browser and no video is sent anywhere. Works as an OBS overlay.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://aveleage.github.io/handlab/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23f6f8f9'/%3E%3Cpath d='M5 24a11 11 0 0 1 22 0' fill='none' stroke='%2313232d' stroke-width='3'/%3E%3Cpath d='M16 24l6-13' stroke='%23d12f2a' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='24' r='2.6' fill='%2313232d'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <h1 class="wordmark">HandLab</h1>
+  <p data-t="head.tagline"></p>
+  <label class="lang"><span data-t="lang.label"></span> <select id="langSel"></select></label>
+</header>
+
+<main class="bench">
+  <div>
+    <div id="stage">
+      <canvas id="view"></canvas>
+      <div class="dim"></div><div class="dim"></div><div class="dim"></div><div class="dim"></div>
+      <div id="cropBox"></div>
+      <div id="cover">
+        <button class="primary big" id="startBtn" data-t="cover.start"></button>
+        <p id="coverText"></p>
+      </div>
+    </div>
+    <div id="notes"></div>
+  </div>
+
+  <div class="sheet">
+    <!-- 計器：テンション（−100〜+100%）。中央が楽な構え、赤い帯は ±50% より外 -->
+    <section class="dial" data-t-title="dial.help">
+      <svg id="dial" viewBox="0 0 240 136" role="img" aria-hidden="true"></svg>
+      <div class="readout" id="readout"><output id="stTension">—</output><span class="unit">%</span></div>
+      <div class="readout-label" data-t="dial.tension"></div>
+      <dl class="rows">
+        <dt data-t="dial.angle"></dt><dd id="stAngle">—</dd>
+        <dt data-t="range.label"></dt><dd id="stRange"></dd>
+      </dl>
+    </section>
+
+    <section class="step">
+      <h2><span class="n">1</span><span data-t="s1.title"></span></h2>
+      <dl class="rows">
+        <dt data-t="st.cam"></dt><dd id="stCam">—</dd>
+        <dt data-t="st.fps"></dt><dd id="stFps">—</dd>
+        <dt data-t="st.hit"></dt><dd id="stHit">—</dd>
+      </dl>
+      <label class="field"><span data-t="cam.pick"></span> <select id="camSel" style="max-width:200px"><option value=""></option></select></label>
+      <label class="check"><input type="checkbox" id="skeleton" checked> <span data-t="skeleton.show"></span></label>
+      <button class="wide gap" id="stopBtn" style="display:none" data-t="cam.stop" data-t-title="cam.stopTitle"></button>
+    </section>
+
+    <section class="step">
+      <h2><span class="n">2</span><span data-t="s2.title"></span></h2>
+      <div id="calibBox" class="notice" style="display:none;margin-top:0">
+        <div id="calibText"></div>
+        <div id="calibSub" class="hint"></div>
+        <div class="buttons">
+          <button id="calibSave" class="primary" data-t="calib.save" style="display:none"></button>
+          <button id="calibRetry" data-t="calib.retry" style="display:none"></button>
+          <button id="calibCancel" data-t="calib.cancel"></button>
+        </div>
+      </div>
+      <button class="wide" id="calibBtn"></button>
+      <p class="hint" data-t="calib.hint"></p>
+    </section>
+
+    <section class="step">
+      <h2><span class="n">3</span><span data-t="s3.title"></span></h2>
+      <button class="wide" id="cropBtn"></button>
+      <p class="hint" id="cropHint"></p>
+      <label class="check"><input type="checkbox" id="gaugeOn" checked> <span data-t="gauge.on"></span></label>
+      <p class="hint gap" data-t="obs.urlHint"></p>
+      <div class="copyrow">
+        <input type="text" id="obsUrl" readonly>
+        <button id="obsCopy" data-t="copy"></button>
+      </div>
+      <details open>
+        <summary data-t="obs.m1.title"></summary>
+        <ol>
+          <li id="m1s1"></li>
+          <li data-t="obs.m1.s2"></li>
+          <li data-t="obs.m1.s3"></li>
+        </ol>
+      </details>
+      <details>
+        <summary data-t="obs.m2.title"></summary>
+        <ol>
+          <li><span data-t="obs.m2.s1"></span><br><code>--enable-media-stream --use-fake-ui-for-media-stream</code></li>
+          <li data-t="obs.m2.s2"></li>
+          <li data-t="obs.m2.s3"></li>
+        </ol>
+        <p class="hint" data-t="obs.m2.hint"></p>
+      </details>
+    </section>
+  </div>
+</main>
+
+<footer class="foot">
+  <p data-t="foot.privacy"></p>
+  <ul>
+    <li><span data-t="foot.by"></span> Racran</li>
+    <li><span data-t="foot.contact"></span> <a href="https://x.com/1isss_" target="_blank" rel="noopener">X @1isss_</a></li>
+    <li><a href="licenses.html" data-t="foot.licenses"></a></li>
+    <li>© 2026 Racran, MIT License</li>
+  </ul>
+</footer>
+
+<script type="module">
+import {
+  Engine, Rate, render, cleanCrop, loadSettings, saveSettings, settingsToHash,
+  tensionPercent, tiltSide, validRange, GLOW_START,
+} from "./handlab.js";
+import { openSource, listCameras } from "./source.js";
+import { LANGS, setLang, getLang, t, applyI18n } from "./i18n.js";
+
+const $ = (id) => document.getElementById(id);
+const signed = (v, d = 0) => (v > 0 ? "+" : "") + Number(v).toFixed(d);
+const settings = loadSettings();
+const state = { angle: null, tension: null, running: false, source: null, switchTo: null };
+
+/* ---------- 言語 ---------- */
+// 言語を切り替えたときに出し直せるよう、状態で変わる文言は「キーと値」で覚えておく
+const cover = { key: "cover.intro", vars: null };
+const notes = new Map();  // id → [キー, 値]
+function setCover(key, vars = null) { cover.key = key; cover.vars = vars; $("coverText").textContent = t(key, vars); }
+function note(id, key, vars = null) {  // 映像の下に出す注意書き。key が空なら消す
+  if (key) notes.set(id, [key, vars]); else notes.delete(id);
+  $("notes").replaceChildren(...[...notes.values()].map(([k, v]) => {
+    const el = document.createElement("div"); el.className = "notice"; el.textContent = t(k, v); return el;
+  }));
+}
+function refreshTexts() {
+  applyI18n();
+  document.title = t("page.title");
+  setCover(cover.key, cover.vars);
+  note();
+  cropTexts();
+  const auto = $("camSel").querySelector('option[value=""]');
+  if (auto) auto.textContent = t("cam.auto");
+  persist();
+}
+for (const [code, name] of Object.entries(LANGS)) { const o = document.createElement("option"); o.value = code; o.textContent = name; $("langSel").append(o); }
+$("langSel").value = setLang(settings.lang);
+$("langSel").onchange = (e) => { settings.lang = setLang(e.target.value); refreshTexts(); };
+
+/* ---------- 計器 ---------- */
+const SWEEP = 80;  // 針の振れ幅（度）。±100% がこの角度
+const CX = 120, CY = 124, R = 100;
+function buildDial() {
+  const at = (pct, r) => { const a = (pct / 100) * SWEEP * Math.PI / 180; return [CX + r * Math.sin(a), CY - r * Math.cos(a)]; };
+  const arc = (from, to, cls) => { const [x0, y0] = at(from, R), [x1, y1] = at(to, R); return `<path class="arc ${cls}" d="M${x0} ${y0}A${R} ${R} 0 0 1 ${x1} ${y1}"/>`; };
+  let s = arc(-100, 100, "") + arc(-100, -GLOW_START, "hot") + arc(GLOW_START, 100, "hot");
+  for (let p = -100; p <= 100; p += 10) {
+    const major = p % 50 === 0, [x0, y0] = at(p, R - 2), [x1, y1] = at(p, R - (major ? 15 : 8));
+    s += `<line class="tick ${major ? "" : "minor"}" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}"/>`;
+    if (major) { const [x, y] = at(p, R - 27); s += `<text x="${x}" y="${y + 4}">${p > 0 ? "+" : ""}${p}</text>`; }
+  }
+  s += `<g id="needle" class="idle selftest"><line x1="${CX}" y1="${CY}" x2="${CX}" y2="${CY - R + 12}"/><circle cx="${CX}" cy="${CY}" r="6"/></g>`;
+  $("dial").innerHTML = s;
+  $("needle").addEventListener("animationend", () => $("needle").classList.remove("selftest"));
+}
+function showDial(tension) {
+  const needle = $("needle"), hot = tension != null && Math.abs(tension) > GLOW_START;
+  $("stTension").textContent = tension == null ? "—" : signed(tension);
+  $("readout").classList.toggle("hot", hot);
+  if (needle.classList.contains("selftest")) return;  // 最初の一振りの間は針に触らない
+  needle.classList.toggle("idle", tension == null);
+  needle.classList.toggle("hot", hot);
+  needle.style.transform = `rotate(${((tension || 0) / 100) * SWEEP}deg)`;
+}
+buildDial();
+
+/* ---------- 設定の保存と、OBS 用の URL ---------- */
+function persist() {
+  saveSettings(settings);
+  const url = new URL("overlay.html", location.href);
+  url.search = "";
+  url.hash = settingsToHash({ ...settings, lang: getLang() });  // OBS の中でも同じ言語で出るように、言語は必ず入れる
+  $("obsUrl").value = url.href;
+  $("m1s1").innerHTML = t("obs.m1.s1", { a: `<a href="${url.href.replace(/"/g, "&quot;")}" target="_blank" rel="noopener">`, z: "</a>" });
+  const r = settings.range;
+  $("stRange").textContent = r ? t("range.value", { min: signed(r.min), max: signed(r.max), neutral: signed(r.neutral) }) : t("range.unset");
+  $("calibBtn").textContent = t(r ? "calib.again" : "calib.start");
+  $("calibBtn").classList.toggle("primary", state.running && !r);  // 青いボタンは「次にやること」ひとつだけにする
+}
+$("skeleton").checked = settings.skeleton !== false;
+$("gaugeOn").checked = settings.gauge !== false;
+$("skeleton").onchange = (e) => { settings.skeleton = e.target.checked; persist(); };
+$("gaugeOn").onchange = (e) => { settings.gauge = e.target.checked; persist(); };
+$("obsUrl").onfocus = (e) => e.target.select();
+$("obsCopy").onclick = async () => {
+  try { await navigator.clipboard.writeText($("obsUrl").value); } catch (e) { $("obsUrl").select(); document.execCommand("copy"); }
+  $("obsCopy").textContent = t("copied");
+  setTimeout(() => { $("obsCopy").textContent = t("copy"); }, 1500);
+};
+
+/* ---------- 映像の解析 ---------- */
+const rate = new Rate(), hits = [];
+function showStatus(res) {
+  $("stFps").textContent = `${rate.fps.toFixed(1)} fps`;
+  const now = performance.now();
+  hits.push([now, res && res.points ? 1 : 0]);
+  while (hits.length && hits[0][0] < now - 5000) hits.shift();
+  $("stHit").textContent = `${(hits.reduce((a, h) => a + h[1], 0) / hits.length * 100).toFixed(0)} %`;
+  $("stAngle").textContent = state.angle == null ? "—" : `${signed(state.angle, 1)}°`;
+  showDial(state.tension);
+}
+
+async function refreshCameras() {
+  const labels = await listCameras();
+  const sel = $("camSel");
+  sel.innerHTML = '<option value=""></option>';
+  sel.firstChild.textContent = t("cam.auto");
+  for (const label of labels) { const o = document.createElement("option"); o.value = o.textContent = label; sel.append(o); }
+  sel.value = labels.includes(settings.camera) ? settings.camera : "";
+}
+$("camSel").onchange = (e) => { settings.camera = e.target.value; persist(); state.switchTo = e.target.value; };
+
+async function start() {
+  $("startBtn").disabled = true;
+  let engine;
+  try {
+    engine = await Engine.create({ onProgress: (k) => k && setCover("cover." + k) });
+  } catch (e) {
+    setCover("cover.modelFail", { msg: e.message || e });
+    $("startBtn").disabled = false;
+    return;
+  }
+  setCover("cover.opening");
+  try {
+    state.source = await openSource(settings.camera);
+  } catch (e) {
+    if (e.name === "NotReadableError" || e.name === "AbortError") setCover("cover.noFrames", { name: e.name });
+    else setCover("cover.denied", { detail: `${e.name || ""} ${e.message || e}`.trim() });
+    $("startBtn").disabled = false;
+    return;
+  }
+  $("cover").style.display = "none";
+  $("stopBtn").style.display = "";
+  $("stCam").textContent = state.source.label;
+  if (state.source.kind === "camera") refreshCameras();
+  note("delegate", engine.delegate === "CPU" ? "note.cpu" : "");
+  state.running = true;
+  persist();
+  for (;;) {
+    if (state.switchTo !== null) {  // カメラの切り替え
+      const label = state.switchTo; state.switchTo = null;
+      try { const next = await openSource(label); state.source.stop(); state.source = next; $("stCam").textContent = next.label; note("cam", ""); }
+      catch (e) { note("cam", "note.camFail", { msg: e.message || e }); }
+    }
+    if (state.stop) {  // 「カメラを止める」：カメラを放して、最初の画面に戻る
+      state.stop = false; state.running = false;
+      state.source.stop(); state.source = null; state.angle = state.tension = null;
+      $("cover").style.display = ""; $("stopBtn").style.display = "none"; $("startBtn").disabled = false;
+      $("stCam").textContent = "—"; $("stAngle").textContent = "—";
+      showDial(null);
+      persist();
+      setCover("cover.stopped");
+      return;
+    }
+    const frame = await state.source.next();
+    let res = null;
+    try { res = await engine.analyze(frame.image, frame.width, frame.height); } catch (e) { /* 1 コマ失敗しても続ける */ }
+    rate.tick();
+    const range = settings.range;
+    state.angle = res ? res.angle : null;
+    state.tension = state.angle != null && range ? tensionPercent(state.angle, range) : null;
+    const side = state.tension != null ? tiltSide(res.points[0], res.forearm, state.tension) : null;
+    $("stage").style.setProperty("--ar", frame.width / frame.height);
+    // 操作画面では映像の全体を出す（OBS に映す範囲は、白い枠で示す）
+    render($("view"), frame.image, frame.width, frame.height, res, { skeleton: settings.skeleton, tension: state.tension, side });
+    showStatus(res);
+    $("stCam").title = state.source.info();
+    if (frame.release) frame.release();
+  }
+}
+$("startBtn").onclick = start;
+$("stopBtn").onclick = () => { state.stop = true; };
+
+/* ---------- 可動域の測定：楽な構え（中立）→ 左右の限界まで往復（上限・下限） ---------- */
+const CALIB = { ready: 3, neutral: 2, sweep: 9 };  // 各段階の秒数
+let calib = null;
+const pct = (sorted, p) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.round(p * (sorted.length - 1))))];
+function startCalib() {
+  if (!state.running) { alert(t("calib.needStart")); return; }
+  calib = { phase: "ready", until: performance.now() + CALIB.ready * 1000, neutral: [], sweep: [], result: null, text: null, sub: null };
+  $("calibBox").style.display = ""; $("calibSave").style.display = "none"; $("calibRetry").style.display = "none"; $("calibBtn").style.display = "none";
+}
+function endCalib() { calib = null; $("calibBox").style.display = "none"; $("calibBtn").style.display = ""; }
+function calibTick() {
+  if (!calib) return;
+  if (calib.phase === "done") {  // 結果の文言（言語を切り替えても出し直せるよう、毎回キーから作る）
+    $("calibText").textContent = t(...calib.text); $("calibSub").textContent = t(...calib.sub);
+    return;
+  }
+  const left = Math.max(0, (calib.until - performance.now()) / 1000), a = state.angle, s = Math.ceil(left);
+  $("calibSub").textContent = a == null ? t("calib.nowNone") : t("calib.now", { a: signed(a, 1) });
+  $("calibText").textContent = t("calib." + calib.phase, { s });
+  if (calib.phase === "ready") {
+    if (left <= 0) { calib.phase = "neutral"; calib.until = performance.now() + CALIB.neutral * 1000; }
+  } else if (calib.phase === "neutral") {
+    if (a != null) calib.neutral.push(a);
+    if (left <= 0) { calib.phase = "sweep"; calib.until = performance.now() + CALIB.sweep * 1000; }
+  } else if (calib.phase === "sweep") {
+    if (a != null) calib.sweep.push(a);
+    if (left <= 0) finishCalib();
+  }
+}
+function finishCalib() {
+  calib.phase = "done";
+  $("calibRetry").style.display = "";
+  const n = calib.neutral.slice().sort((x, y) => x - y), s = calib.sweep.slice().sort((x, y) => x - y);
+  if (n.length < 5 || s.length < 25) { calib.text = ["calib.fail"]; calib.sub = ["calib.failSub"]; return; }
+  // 一瞬の外れ値に引っ張られないよう、両端は上下 3% を除いた値を使う
+  const r = { min: pct(s, 0.03), neutral: pct(n, 0.5), max: pct(s, 0.97) };
+  const shown = { min: signed(r.min, 1), neutral: signed(r.neutral, 1), max: signed(r.max, 1) };
+  if (!validRange(r)) { calib.text = ["calib.small", shown]; calib.sub = ["calib.smallSub"]; return; }
+  calib.result = r;
+  calib.text = ["calib.result", shown]; calib.sub = ["calib.resultSub"];
+  $("calibSave").style.display = "";
+}
+$("calibBtn").onclick = startCalib;
+$("calibRetry").onclick = startCalib;
+$("calibCancel").onclick = endCalib;
+$("calibSave").onclick = () => { settings.range = validRange(calib.result); persist(); endCalib(); };
+setInterval(calibTick, 100);
+
+/* ---------- OBS に映す範囲：角は 2 辺まとめて、辺は 1 辺だけ、枠の中は移動 ---------- */
+const MIN_KEEP = 0.05;  // 残す最小の割合
+const box = $("cropBox"), dims = document.querySelectorAll(".dim");
+for (const k of ["l", "t", "r", "b", "nw", "ne", "sw", "se"]) { const h = document.createElement("div"); h.className = "hd " + k; h.dataset.k = k; box.append(h); }
+function placeBox() {
+  const c = settings.crop;
+  box.style.left = c.l * 100 + "%"; box.style.top = c.t * 100 + "%"; box.style.right = c.r * 100 + "%"; box.style.bottom = c.b * 100 + "%";
+  dims[0].style.cssText = `left:0;top:0;right:0;height:${c.t * 100}%`;
+  dims[1].style.cssText = `left:0;bottom:0;right:0;height:${c.b * 100}%`;
+  dims[2].style.cssText = `left:0;top:${c.t * 100}%;bottom:${c.b * 100}%;width:${c.l * 100}%`;
+  dims[3].style.cssText = `right:0;top:${c.t * 100}%;bottom:${c.b * 100}%;width:${c.r * 100}%`;
+}
+function dragged(kind, start, dx, dy) {
+  const c = { ...start }, lim = (v, max) => Math.min(Math.max(v, 0), max);
+  if (kind !== "move") {
+    if (kind.includes("w") || kind === "l") c.l = lim(start.l + dx, 1 - MIN_KEEP - start.r);
+    if (kind.includes("e") || kind === "r") c.r = lim(start.r - dx, 1 - MIN_KEEP - start.l);
+    if (kind.includes("n") || kind === "t") c.t = lim(start.t + dy, 1 - MIN_KEEP - start.b);
+    if (kind.includes("s") || kind === "b") c.b = lim(start.b - dy, 1 - MIN_KEEP - start.t);
+  } else {  // 枠ごと移動（大きさは変えない）
+    const mx = lim(start.l + dx, start.l + start.r) - start.l, my = lim(start.t + dy, start.t + start.b) - start.t;
+    c.l = start.l + mx; c.r = start.r - mx; c.t = start.t + my; c.b = start.b - my;
+  }
+  return c;
+}
+let drag = null;
+box.addEventListener("pointerdown", (e) => {
+  drag = { kind: e.target.dataset.k || "move", x: e.clientX, y: e.clientY, start: { ...settings.crop } };
+  box.setPointerCapture(e.pointerId); e.preventDefault();
+});
+box.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const r = $("stage").getBoundingClientRect();
+  settings.crop = cleanCrop(dragged(drag.kind, drag.start, (e.clientX - drag.x) / r.width, (e.clientY - drag.y) / r.height));
+  placeBox();
+});
+const endDrag = () => { if (drag) { drag = null; persist(); } };
+box.addEventListener("pointerup", endDrag); box.addEventListener("pointercancel", endDrag);
+function cropTexts() {
+  const on = $("stage").classList.contains("edit");
+  $("cropBtn").textContent = t(on ? "crop.done" : "crop.start");
+  $("cropHint").textContent = t(on ? "crop.editHint" : "crop.hint");
+  if (on) {
+    const reset = document.createElement("button");
+    reset.textContent = t("crop.reset"); reset.style.marginLeft = "8px"; reset.style.padding = "2px 10px";
+    reset.onclick = () => { settings.crop = { l: 0, t: 0, r: 0, b: 0 }; placeBox(); persist(); };
+    $("cropHint").append(reset);
+  }
+}
+$("cropBtn").onclick = () => { $("stage").classList.toggle("edit"); cropTexts(); placeBox(); };
+placeBox();
+
+/* ---------- 始める ---------- */
+refreshTexts();
+showDial(null);
+if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) setCover("cover.needHttps");
+// 開発用の入力（localhost だけ）のときは自動で始める
+if (["localhost", "127.0.0.1", "[::1]"].includes(location.hostname) && new URLSearchParams(location.search).has("frames")) start();
+</script>
+</body>
+</html>
