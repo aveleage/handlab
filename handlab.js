@@ -241,8 +241,8 @@ export function render(canvas, source, width, height, result, opts = {}) {
 // ---- 設定（このブラウザの中だけに保存する） ----
 const STORE_KEY = "handlab.v1";
 const OLD_STORE_KEY = "aimhand.v1"; // 改名前（AimHand）の保存先。新しいほうが無ければ、こちらを読む
-// lang は画面の言語（"" なら、ブラウザの言語に合わせる）
-export const DEFAULT_SETTINGS = { range: null, crop: { l: 0, t: 0, r: 0, b: 0 }, skeleton: true, gauge: true, camera: "", lang: "" };
+// lang は画面の言語（"" なら、ブラウザの言語に合わせる）。theme は見た目（"" と "dark" は黒基調、"light" は明るい色）
+export const DEFAULT_SETTINGS = { range: null, crop: { l: 0, t: 0, r: 0, b: 0 }, skeleton: true, gauge: true, camera: "", lang: "", theme: "" };
 
 export function loadSettings() {
   let saved = {};
