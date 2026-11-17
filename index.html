@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<script type="importmap">{"imports":{"./handlab.js":"./handlab.js?v=f5cb223c","./source.js":"./source.js?v=f5cb223c","./i18n.js":"./i18n.js?v=f5cb223c","./strings.js":"./strings.js?v=f5cb223c"}}</script>
+<script type="importmap">{"imports":{"./handlab.js":"./handlab.js?v=87eef42d","./source.js":"./source.js?v=87eef42d","./i18n.js":"./i18n.js?v=87eef42d","./strings.js":"./strings.js?v=87eef42d"}}</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HandLab — measure wrist tension while you aim</title>
@@ -14,7 +14,7 @@
 <script>try { document.documentElement.dataset.theme = (JSON.parse(localStorage.getItem("handlab.v1") || "{}").theme) || "dark"; } catch (e) { document.documentElement.dataset.theme = "dark"; }</script>
 <!-- 訪問の回数だけを数える（GoatCounter。Cookie なし）。操作画面にだけ入れる。localhost では数えない（count.js の仕様） -->
 <script data-goatcounter="https://racran.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
-<link rel="stylesheet" href="style.css?v=f5cb223c">
+<link rel="stylesheet" href="style.css?v=87eef42d">
 </head>
 <body class="app">
 <header class="top">
@@ -52,8 +52,8 @@
       </dl>
     </section>
 
-    <section class="step">
-      <h2><span class="n">1</span><span data-t="s1.title"></span></h2>
+    <section class="step" data-fold="s1">
+      <h2><button class="fold" type="button" aria-expanded="true"><span class="n">1</span><span class="ttl" data-t="s1.title"></span><span class="sum" id="sum-s1"></span></button></h2>
       <dl class="rows">
         <dt data-t="st.cam"></dt><dd id="stCam">—</dd>
         <dt data-t="st.fps"></dt><dd id="stFps">—</dd>
@@ -68,8 +68,8 @@
       <button class="wide gap" id="stopBtn" style="display:none" data-t="cam.stop" data-t-title="cam.stopTitle"></button>
     </section>
 
-    <section class="step">
-      <h2><span class="n">2</span><span data-t="s2.title"></span></h2>
+    <section class="step" data-fold="s2">
+      <h2><button class="fold" type="button" aria-expanded="true"><span class="n">2</span><span class="ttl" data-t="s2.title"></span><span class="sum" id="sum-s2"></span></button></h2>
       <div id="calibBox" class="notice" style="display:none;margin-top:0">
         <div id="calibText"></div>
         <div id="calibSub" class="hint"></div>
@@ -83,8 +83,8 @@
       <p class="hint" data-t="calib.hint"></p>
     </section>
 
-    <section class="step">
-      <h2><span class="n">3</span><span data-t="s3.title"></span></h2>
+    <section class="step" data-fold="s3">
+      <h2><button class="fold" type="button" aria-expanded="true"><span class="n">3</span><span class="ttl" data-t="s3.title"></span><span class="sum" id="sum-s3"></span></button></h2>
       <button class="wide" id="cropBtn"></button>
       <p class="hint" id="cropHint"></p>
       <label class="check"><input type="checkbox" id="gaugeOn" checked> <span data-t="gauge.on"></span></label>
@@ -113,8 +113,8 @@
     </section>
 
     <!-- 試験機能：入力の色。手の位置に円を描き、色はマウスの速さだけで決める -->
-    <section class="step" id="motionStep">
-      <h2><span class="n">β</span><span data-t="mo.title"></span></h2>
+    <section class="step" id="motionStep" data-fold="mo">
+      <h2><button class="fold" type="button" aria-expanded="true"><span class="n">β</span><span class="ttl" data-t="mo.title"></span><span class="sum" id="sum-mo"></span></button></h2>
       <label class="check"><input type="checkbox" id="motionOn"> <span data-t="mo.on"></span></label>
       <label class="field"><span data-t="mo.dpi"></span> <input type="number" id="dpiIn" min="100" max="64000" step="50" style="width:90px"></label>
       <p class="hint" id="motionState"></p>
@@ -122,8 +122,8 @@
     </section>
 
     <!-- アプリ版（開発中）と、開発の寄付 -->
-    <section class="step" id="appStep">
-      <h2><span class="n">+</span><span data-t="app.title"></span></h2>
+    <section class="step" id="appStep" data-fold="app">
+      <h2><button class="fold" type="button" aria-expanded="true"><span class="n">+</span><span class="ttl" data-t="app.title"></span><span class="sum" id="sum-app"></span></button></h2>
       <p class="hint" style="margin-top:0" data-t="app.body"></p>
       <ul class="hint applist">
         <li data-t="app.f1"></li>
@@ -173,6 +173,7 @@ function note(id, key, vars = null) {  // 映像の下に出す注意書き。ke
 }
 function refreshTexts() {
   applyI18n();
+  foldSums();
   document.title = t("page.title");
   setCover(cover.key, cover.vars);
   note();
@@ -348,6 +349,39 @@ async function start() {
 $("startBtn").onclick = start;
 $("stopBtn").onclick = () => { state.stop = true; };
 
+/* ---------- 右の欄：見出しを押して畳む ----------
+   畳んだ欄は、見出しの右に「いまの状態」を 1 行で出す。開け閉めはこのブラウザに覚えておく。
+   はじめて来た人には、①と、まだ済んでいない②だけを開いて見せる */
+const FOLD_DEFAULT = () => ({ s1: false, s2: !!settings.range, s3: true, mo: true, app: true });  // true = 畳む
+function foldState() { return { ...FOLD_DEFAULT(), ...(settings.fold || {}) }; }
+function setFold(key, closed) {
+  const sec = document.querySelector(`[data-fold="${key}"]`);
+  sec.classList.toggle("closed", closed);
+  sec.querySelector(".fold").setAttribute("aria-expanded", String(!closed));
+}
+function foldSums() {
+  const r = settings.range, c = settings.crop || {};
+  const sums = {
+    s1: state.running ? t("sum.s1.on", { fps: $("stFps").textContent }) : t("sum.s1.off"),
+    s2: r ? t("range.value", { min: signed(r.min), max: signed(r.max), neutral: signed(r.neutral) }) : t("range.unset"),
+    s3: c.l || c.t || c.r || c.b ? t("sum.s3.crop") : t("sum.s3.full"),
+    mo: t(settings.motion ? "sum.mo.on" : "sum.mo.off"),
+    app: "",
+  };
+  for (const [k, v] of Object.entries(sums)) $("sum-" + k).textContent = v;
+}
+for (const sec of document.querySelectorAll("[data-fold]")) {
+  const key = sec.dataset.fold;
+  setFold(key, foldState()[key]);
+  sec.querySelector(".fold").onclick = () => {
+    const closed = !sec.classList.contains("closed");
+    settings.fold = { ...foldState(), [key]: closed };
+    setFold(key, closed); persist();
+    if (!closed) sec.scrollIntoView({ block: "nearest" });  // 開いた欄の中身が見えるところまで送る
+  };
+}
+setInterval(foldSums, 1000);  // fps などが変わるので、ときどき書き直す（畳んでいる欄だけが見える）
+
 /* ---------- 開発の寄付（フッターに小さく。受付ページの URL が無ければ出さない） ---------- */
 if (DONATE_URL) {
   $("donateFootLink").href = DONATE_URL;
@@ -497,7 +531,7 @@ function cropTexts() {
     $("cropHint").append(reset);
   }
 }
-$("cropBtn").onclick = () => { $("stage").classList.toggle("edit"); cropTexts(); placeBox(); };
+$("cropBtn").onclick = () => { $("stage").classList.toggle("edit"); cropTexts(); placeBox(); foldSums(); };
 placeBox();
 
 /* ---------- 始める ---------- */

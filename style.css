@@ -91,7 +91,8 @@ code { font: 12.5px/1.5 Consolas, "Cascadia Mono", monospace; background: var(--
 @media (min-width: 941px) {
   body.app { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
   .app .bench { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); align-items: stretch; padding-bottom: 12px; }
-  .app .bench > div:first-child { position: static; min-height: 0; overflow-y: auto; }
+  .app .bench > div:first-child { position: static; min-height: 0; container-type: size; }  /* 映像は、この欄の幅と高さの両方に収まる大きさにする */
+  .app #stage { width: min(100cqw, 100cqh * var(--ar, 1.7778)); }
   .app .sheet { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   .app .foot { flex: none; padding: 2px 24px 10px; }
   .app .foot p { margin-bottom: 2px; }
@@ -100,6 +101,19 @@ code { font: 12.5px/1.5 Consolas, "Cascadia Mono", monospace; background: var(--
 .sheet > section { padding: 14px 16px 16px; border-top: 1.5px solid var(--edge); }
 .sheet > section:first-child { border-top: 0; }
 .step h2 { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; margin: 0 0 10px; }
+/* 見出しを押すと畳める。畳んだときは、見出しの右に「いまの状態」を 1 行で出す */
+.step h2 .fold { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; width: 100%; cursor: pointer; border-radius: 3px; }
+.step h2 .fold:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+.step h2 .fold .ttl { flex: none; }
+.step h2 .fold .sum { flex: 1; min-width: 0; text-align: right; font-weight: 400; font-size: 12.5px; color: var(--soft);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; visibility: hidden; }
+.step h2 .fold::after { content: ""; flex: none; width: 7px; height: 7px; border: solid var(--soft); border-width: 0 1.5px 1.5px 0;
+  transform: translateY(-2px) rotate(45deg); margin: 0 3px 0 2px; }
+.step.closed { padding-bottom: 14px; }
+.step.closed h2 { margin: 0; }
+.step.closed h2 .fold .sum { visibility: visible; }
+.step.closed h2 .fold::after { transform: rotate(-45deg); }
+.step.closed > :not(h2) { display: none !important; }
 .step h2 .n { font: 600 15px/1 var(--num); width: 24px; height: 24px; border: 1.5px solid var(--ink); border-radius: 50%;
   display: grid; place-items: center; flex: none; padding-top: 1px; }
 .hint { color: var(--soft); font-size: 12.5px; margin: 8px 0 0; }
