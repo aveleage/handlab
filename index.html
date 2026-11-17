@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<script type="importmap">{"imports":{"./handlab.js":"./handlab.js?v=bca34787","./source.js":"./source.js?v=bca34787","./i18n.js":"./i18n.js?v=bca34787","./strings.js":"./strings.js?v=bca34787"}}</script>
+<script type="importmap">{"imports":{"./handlab.js":"./handlab.js?v=f5cb223c","./source.js":"./source.js?v=f5cb223c","./i18n.js":"./i18n.js?v=f5cb223c","./strings.js":"./strings.js?v=f5cb223c"}}</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HandLab — measure wrist tension while you aim</title>
@@ -14,9 +14,9 @@
 <script>try { document.documentElement.dataset.theme = (JSON.parse(localStorage.getItem("handlab.v1") || "{}").theme) || "dark"; } catch (e) { document.documentElement.dataset.theme = "dark"; }</script>
 <!-- 訪問の回数だけを数える（GoatCounter。Cookie なし）。操作画面にだけ入れる。localhost では数えない（count.js の仕様） -->
 <script data-goatcounter="https://racran.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
-<link rel="stylesheet" href="style.css?v=bca34787">
+<link rel="stylesheet" href="style.css?v=f5cb223c">
 </head>
-<body>
+<body class="app">
 <header class="top">
   <h1 class="wordmark">HandLab</h1>
   <p data-t="head.tagline"></p>
@@ -130,8 +130,6 @@
         <li data-t="app.f2"></li>
         <li data-t="app.f3"></li>
       </ul>
-      <a class="btn primary wide" id="donateBtn" target="_blank" rel="noopener" data-t="app.donate" hidden></a>
-      <p class="hint" id="donateSoon" data-t="app.donateSoon"></p>
     </section>
   </div>
 </main>
@@ -350,11 +348,10 @@ async function start() {
 $("startBtn").onclick = start;
 $("stopBtn").onclick = () => { state.stop = true; };
 
-/* ---------- 開発の寄付（受付ページができるまでは「準備中」） ---------- */
+/* ---------- 開発の寄付（フッターに小さく。受付ページの URL が無ければ出さない） ---------- */
 if (DONATE_URL) {
-  $("donateBtn").href = $("donateFootLink").href = DONATE_URL;
-  $("donateBtn").hidden = $("donateFoot").hidden = false;
-  $("donateSoon").hidden = true;
+  $("donateFootLink").href = DONATE_URL;
+  $("donateFoot").hidden = false;
 }
 
 /* ---------- 入力の色（試験機能） ----------

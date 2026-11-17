@@ -74,10 +74,6 @@ button.primary { background: var(--primary); border-color: var(--primary); color
 button.primary:hover { background: var(--primary-hover); }
 button.big { padding: 13px 22px; font-size: 16px; }
 button.wide { width: 100%; }
-a.btn { display: inline-block; padding: 7px 14px; border: 1.5px solid var(--edge); border-radius: 3px; text-decoration: none; text-align: center; box-sizing: border-box; }
-a.btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
-a.btn.primary:hover { background: var(--primary-hover); }
-a.btn.wide { display: block; width: 100%; margin-top: 10px; }
 [hidden] { display: none !important; }  /* 見た目の指定で hidden が効かなくならないように */
 .applist { margin: 6px 0 0; padding-left: 1.2em; }
 .applist li { margin: 2px 0; }
@@ -91,6 +87,15 @@ code { font: 12.5px/1.5 Consolas, "Cascadia Mono", monospace; background: var(--
 .bench { display: grid; grid-template-columns: minmax(0, 1fr) 372px; gap: 20px; padding: 0 24px 20px; align-items: start; }
 .bench > div:first-child { position: sticky; top: 12px; }  /* 右の紙を下まで読んでも、映像は見えたままにする */
 @media (max-width: 940px) { .bench { grid-template-columns: 1fr; } .bench > div:first-child { position: static; } }
+/* 広い画面：ページ全体は動かさず、右の紙だけをスクロールする（映像・題字・フッターは画面に収めたまま） */
+@media (min-width: 941px) {
+  body.app { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  .app .bench { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); align-items: stretch; padding-bottom: 12px; }
+  .app .bench > div:first-child { position: static; min-height: 0; overflow-y: auto; }
+  .app .sheet { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .app .foot { flex: none; padding: 2px 24px 10px; }
+  .app .foot p { margin-bottom: 2px; }
+}
 .sheet { background: var(--sheet); border: 1.5px solid var(--edge); border-radius: 3px; }
 .sheet > section { padding: 14px 16px 16px; border-top: 1.5px solid var(--edge); }
 .sheet > section:first-child { border-top: 0; }
@@ -147,8 +152,8 @@ ol li { margin: 3px 0; }
 #cropBox { position: absolute; display: none; outline: 2px solid #fff; box-shadow: 0 0 0 1px #000; cursor: move; touch-action: none; }
 .dim { position: absolute; display: none; background: rgba(0, 0, 0, .6); pointer-events: none; }
 #stage.edit #cropBox, #stage.edit .dim { display: block; }
-#stage.edit { overflow: visible; }
-#stage.grab { cursor: pointer; }  /* 入力の色（試験機能）：クリックでマウスを捕まえる */  /* 端にある角のつまみが切れないように */
+#stage.edit { overflow: visible; }  /* 端にある角のつまみが切れないように */
+#stage.grab { cursor: pointer; }  /* 入力の色（試験機能）：クリックでマウスを捕まえる */
 .hd { position: absolute; background: #fff; border: 1px solid #000; border-radius: 2px; }
 .hd:hover { background: var(--blue); }
 .hd.l, .hd.r { width: 10px; height: 44px; top: calc(50% - 22px); cursor: ew-resize; }

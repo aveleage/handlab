@@ -5,7 +5,7 @@
 // 録画・学習用の Python 版（AimHand: aimhand/analyze/armnet.py, forearm.py, preview/draw.py）と同じ計算を JavaScript に移したもの。
 // 数値（切り出しの大きさ、しきい値、色）は Python 版と合わせてある。変えるときは両方を直すこと。
 
-// 開発の寄付の受付ページ。空のあいだは、寄付のボタンを出さず「準備中」と出す
+// 開発の寄付の受付ページ（フッターに小さくリンクを出す）。空なら出さない
 export const DONATE_URL = "https://ko-fi.com/racran";
 const MP_VERSION = "1.2.3";
 const ORT_VERSION = "1.31.1";
