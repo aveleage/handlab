@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<script type="importmap">{"imports":{"./handlab.js":"./handlab.js?v=c80ac62a","./source.js":"./source.js?v=c80ac62a","./i18n.js":"./i18n.js?v=c80ac62a","./strings.js":"./strings.js?v=c80ac62a"}}</script>
+<script type="importmap">{"imports":{"./handlab.js":"./handlab.js?v=d1fb1203","./source.js":"./source.js?v=d1fb1203","./i18n.js":"./i18n.js?v=d1fb1203","./strings.js":"./strings.js?v=d1fb1203"}}</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HandLab — measure wrist tension while you aim</title>
@@ -14,7 +14,7 @@
 <script>try { document.documentElement.dataset.theme = (JSON.parse(localStorage.getItem("handlab.v1") || "{}").theme) || "dark"; } catch (e) { document.documentElement.dataset.theme = "dark"; }</script>
 <!-- 訪問の回数だけを数える（GoatCounter。Cookie なし）。操作画面にだけ入れる。localhost では数えない（count.js の仕様） -->
 <script data-goatcounter="https://racran.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
-<link rel="stylesheet" href="style.css?v=c80ac62a">
+<link rel="stylesheet" href="style.css?v=d1fb1203">
 </head>
 <body>
 <header class="top">
@@ -120,6 +120,19 @@
       <p class="hint" id="motionState"></p>
       <p class="hint" data-t="mo.hint"></p>
     </section>
+
+    <!-- アプリ版（開発中）と、開発の寄付 -->
+    <section class="step" id="appStep">
+      <h2><span class="n">+</span><span data-t="app.title"></span></h2>
+      <p class="hint" style="margin-top:0" data-t="app.body"></p>
+      <ul class="hint applist">
+        <li data-t="app.f1"></li>
+        <li data-t="app.f2"></li>
+        <li data-t="app.f3"></li>
+      </ul>
+      <a class="btn primary wide" id="donateBtn" target="_blank" rel="noopener" data-t="app.donate" hidden></a>
+      <p class="hint" id="donateSoon" data-t="app.donateSoon"></p>
+    </section>
   </div>
 </main>
 
@@ -130,6 +143,7 @@
     <li><span data-t="foot.by"></span> Racran</li>
     <li><span data-t="foot.contact"></span> <a href="https://x.com/1isss_" target="_blank" rel="noopener">X @1isss_</a></li>
     <li><a href="licenses.html" data-t="foot.licenses"></a></li>
+    <li id="donateFoot" hidden><a id="donateFootLink" target="_blank" rel="noopener" data-t="app.donateShort"></a></li>
     <li>© 2026 Racran, MIT License</li>
   </ul>
 </footer>
@@ -138,7 +152,7 @@
 import {
   Engine, Rate, render, cleanCrop, loadSettings, saveSettings, settingsToHash,
   tensionPercent, tiltSide, validRange, GLOW_START, orientFrame, mirrorRange,
-  MouseMeter, palmOf, MOTION_TRAIL_MS, CAMERA_LAG_MS,
+  MouseMeter, palmOf, MOTION_TRAIL_MS, CAMERA_LAG_MS, DONATE_URL,
 } from "./handlab.js";
 import { openSource, listCameras } from "./source.js";
 import { LANGS, setLang, getLang, t, applyI18n } from "./i18n.js";
@@ -335,6 +349,13 @@ async function start() {
 }
 $("startBtn").onclick = start;
 $("stopBtn").onclick = () => { state.stop = true; };
+
+/* ---------- 開発の寄付（受付ページができるまでは「準備中」） ---------- */
+if (DONATE_URL) {
+  $("donateBtn").href = $("donateFootLink").href = DONATE_URL;
+  $("donateBtn").hidden = $("donateFoot").hidden = false;
+  $("donateSoon").hidden = true;
+}
 
 /* ---------- 入力の色（試験機能） ----------
    映像をクリックすると、このページがマウスを捕まえる（Esc で戻る）。捕まえている間だけ、マウスの動き（カウント）を読める。

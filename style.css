@@ -74,6 +74,13 @@ button.primary { background: var(--primary); border-color: var(--primary); color
 button.primary:hover { background: var(--primary-hover); }
 button.big { padding: 13px 22px; font-size: 16px; }
 button.wide { width: 100%; }
+a.btn { display: inline-block; padding: 7px 14px; border: 1.5px solid var(--edge); border-radius: 3px; text-decoration: none; text-align: center; box-sizing: border-box; }
+a.btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
+a.btn.primary:hover { background: var(--primary-hover); }
+a.btn.wide { display: block; width: 100%; margin-top: 10px; }
+[hidden] { display: none !important; }  /* 見た目の指定で hidden が効かなくならないように */
+.applist { margin: 6px 0 0; padding-left: 1.2em; }
+.applist li { margin: 2px 0; }
 button:disabled { opacity: .5; cursor: default; }
 select { padding: 5px 8px; min-width: 0; }
 input[type=text] { padding: 6px 8px; min-width: 0; }
