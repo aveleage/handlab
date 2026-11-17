@@ -6,7 +6,7 @@
 // 数値（切り出しの大きさ、しきい値、色）は Python 版と合わせてある。変えるときは両方を直すこと。
 
 // 開発の寄付の受付ページ。空のあいだは、寄付のボタンを出さず「準備中」と出す
-export const DONATE_URL = "";
+export const DONATE_URL = "https://ko-fi.com/racran";
 const MP_VERSION = "1.2.3";
 const ORT_VERSION = "1.31.1";
 const MP_BASE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}`;
