@@ -233,6 +233,79 @@ export function cleanCrop(c) {
  * canvas の大きさは、切り抜いた後の大きさに合わせる（赤い縁は切り抜いた後の端に付く）。
  * opts: { crop, skeleton, tension（null なら縁なし）, side }
  */
+// ---- 入力の色（試験機能） ----
+// 手のひらの中心に円を描き、色はマウスが読んだ速さ（cm/秒）だけで決める（アプリ版と同じ）。
+// 入力が無ければ青。円（手）が動いているのに青なら、マウスが浮いている = リフトだと、見て分かる。
+// ブラウザがマウスの動きを読めるのは、このページがマウスを捕まえている間（Pointer Lock）だけ。
+const SPEED_COLORS = [[255, 214, 10], [255, 128, 16], [255, 40, 36]]; // 黄 → 橙 → 赤
+const IDLE_RGB = [150, 205, 255]; // 入力が無いときの薄い青
+export const COLOR_MID_CM_S = 30; // この速さで橙
+export const COLOR_MAX_CM_S = 80; // この速さ以上は赤
+export const MOTION_TRAIL_MS = 400; // 少し前の位置を薄く残す長さ
+export const CAMERA_LAG_MS = 40; // 映像はマウスより少し遅れて届く（アプリ版の録画で 35〜45ms）
+const PALM_POINTS = [0, 5, 9, 13, 17];
+
+/** マウスの速さ（cm/秒）→ 色 [r, g, b]。0 は青、少しでも読めば黄 → 30 で橙 → 80 以上で赤。 */
+export function speedColor(v) {
+  if (!(v > 0)) return IDLE_RGB;
+  const [a, b, f] = v < COLOR_MID_CM_S ? [SPEED_COLORS[0], SPEED_COLORS[1], v / COLOR_MID_CM_S]
+    : [SPEED_COLORS[1], SPEED_COLORS[2], Math.min(1, (v - COLOR_MID_CM_S) / (COLOR_MAX_CM_S - COLOR_MID_CM_S))];
+  return a.map((x, n) => Math.round(x + (b[n] - x) * f));
+}
+
+/** 手のひらの中心（手首と 4 本の指の付け根の平均）と、手のひらの長さ。 */
+export function palmOf(points) {
+  const x = PALM_POINTS.reduce((s, i) => s + points[i][0], 0) / PALM_POINTS.length;
+  const y = PALM_POINTS.reduce((s, i) => s + points[i][1], 0) / PALM_POINTS.length;
+  return { x, y, palm: Math.hypot(points[9][0] - points[0][0], points[9][1] - points[0][1]) };
+}
+
+/** マウスの動き（カウント）を時刻つきで貯め、ある区間の合計を返す。古いものは捨てる。 */
+export class MouseMeter {
+  constructor(keepMs = 2000) { this.keep = keepMs; this.t = []; this.d = []; }
+  add(t, dx, dy) {
+    if (!dx && !dy) return;
+    this.t.push(t); this.d.push([dx, dy]);
+    while (this.t.length && this.t[0] < t - this.keep) { this.t.shift(); this.d.shift(); }
+  }
+  /** 時刻 (t0, t1] のカウントの合計 [dx, dy]。 */
+  sum(t0, t1) {
+    let x = 0, y = 0;
+    for (let i = 0; i < this.t.length; i++) if (this.t[i] > t0 && this.t[i] <= t1) { x += this.d[i][0]; y += this.d[i][1]; }
+    return [x, y];
+  }
+}
+
+/** 円と尾を描く。trail は古い順の {t, x, y, palm, v}（映像の px と cm/秒）。(x0, y0) は映像の切り抜きの左上。 */
+export function drawMotion(ctx, trail, now, x0 = 0, y0 = 0, lineScale = 1) {
+  const items = trail.filter((m) => now - m.t >= 0 && now - m.t <= MOTION_TRAIL_MS);
+  if (!items.length) return;
+  const cur = items[items.length - 1].t === now ? items[items.length - 1] : null;
+  const look = (m) => {
+    const age = Math.min(1, (now - m.t) / MOTION_TRAIL_MS), s = Math.min(1, m.v / COLOR_MAX_CM_S);
+    return { x: m.x - x0, y: m.y - y0, r: Math.max(4, 0.55 * m.palm * (1 - 0.5 * age)), rgb: speedColor(m.v).join(","),
+      a: (m.v > 0 ? 0.25 + 0.4 * s : 0.45) * Math.pow(1 - age, 1.6), s, idle: !(m.v > 0) };
+  };
+  const dot = (x, y, r, rgb, a) => { ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fillStyle = `rgba(${rgb},${a})`; ctx.fill(); };
+  let prev = null;
+  for (const m of items) {  // 尾。速く動いた所は、間を細かく埋めて、ひと続きに見えるようにする（重なるぶん薄く）
+    const c = look(m);
+    if (prev) {
+      const n = Math.max(1, Math.min(10, Math.ceil(Math.hypot(c.x - prev.x, c.y - prev.y) / (c.r * 0.5))));
+      for (let i = 1; i <= (m === cur ? n - 1 : n); i++) {
+        const f = i / n;
+        dot(prev.x + (c.x - prev.x) * f, prev.y + (c.y - prev.y) * f, prev.r + (c.r - prev.r) * f, c.rgb, c.a * (n > 1 ? 0.45 : 1));
+      }
+    } else if (m !== cur) dot(c.x, c.y, c.r, c.rgb, c.a);
+    prev = c;
+  }
+  if (cur) {  // いまの位置は濃く塗って縁取りし、止まっていても場所が分かるようにする
+    const c = look(cur);
+    dot(c.x, c.y, c.r, c.rgb, c.idle ? 0.45 : 0.3 + 0.4 * c.s);
+    ctx.lineWidth = 2.5 * lineScale; ctx.strokeStyle = `rgba(${c.rgb},${c.idle ? 0.95 : 0.6 + 0.4 * c.s})`; ctx.stroke();
+  }
+}
+
 export function render(canvas, source, width, height, result, opts = {}) {
   const crop = cleanCrop(opts.crop);
   const x0 = Math.round(crop.l * width), y0 = Math.round(crop.t * height);
@@ -242,6 +315,7 @@ export function render(canvas, source, width, height, result, opts = {}) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(source, x0, y0, w, h, 0, 0, w, h);
   const s = Math.max(1, width / 1280); // 線の太さは 1280px 幅を基準にする
+  if (opts.motion) drawMotion(ctx, opts.motion.trail, opts.motion.now, x0, y0, s);  // 骨格より下に描く
   if (opts.skeleton !== false && result && result.points) {
     const p = result.points.map(([x, y]) => [x - x0, y - y0]);
     ctx.lineCap = "round";
@@ -282,7 +356,7 @@ export function render(canvas, source, width, height, result, opts = {}) {
 const STORE_KEY = "handlab.v1";
 const OLD_STORE_KEY = "aimhand.v1"; // 改名前（AimHand）の保存先。新しいほうが無ければ、こちらを読む
 // lang は画面の言語（"" なら、ブラウザの言語に合わせる）。theme は見た目（"" と "dark" は黒基調、"light" は明るい色）
-export const DEFAULT_SETTINGS = { range: null, crop: { l: 0, t: 0, r: 0, b: 0 }, skeleton: true, gauge: true, camera: "", lang: "", theme: "", orient: { rot: 0, fh: false, fv: false } };
+export const DEFAULT_SETTINGS = { range: null, crop: { l: 0, t: 0, r: 0, b: 0 }, skeleton: true, gauge: true, camera: "", lang: "", theme: "", orient: { rot: 0, fh: false, fv: false }, motion: false, dpi: 1600 };
 
 export function loadSettings() {
   let saved = {};

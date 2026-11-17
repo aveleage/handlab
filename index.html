@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<script type="importmap">{"imports":{"./handlab.js":"./handlab.js?v=4067dc9c","./source.js":"./source.js?v=4067dc9c","./i18n.js":"./i18n.js?v=4067dc9c","./strings.js":"./strings.js?v=4067dc9c"}}</script>
+<script type="importmap">{"imports":{"./handlab.js":"./handlab.js?v=c80ac62a","./source.js":"./source.js?v=c80ac62a","./i18n.js":"./i18n.js?v=c80ac62a","./strings.js":"./strings.js?v=c80ac62a"}}</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HandLab — measure wrist tension while you aim</title>
@@ -14,7 +14,7 @@
 <script>try { document.documentElement.dataset.theme = (JSON.parse(localStorage.getItem("handlab.v1") || "{}").theme) || "dark"; } catch (e) { document.documentElement.dataset.theme = "dark"; }</script>
 <!-- 訪問の回数だけを数える（GoatCounter。Cookie なし）。操作画面にだけ入れる。localhost では数えない（count.js の仕様） -->
 <script data-goatcounter="https://racran.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
-<link rel="stylesheet" href="style.css?v=4067dc9c">
+<link rel="stylesheet" href="style.css?v=c80ac62a">
 </head>
 <body>
 <header class="top">
@@ -111,6 +111,15 @@
         <p class="hint" data-t="obs.m2.hint"></p>
       </details>
     </section>
+
+    <!-- 試験機能：入力の色。手の位置に円を描き、色はマウスの速さだけで決める -->
+    <section class="step" id="motionStep">
+      <h2><span class="n">β</span><span data-t="mo.title"></span></h2>
+      <label class="check"><input type="checkbox" id="motionOn"> <span data-t="mo.on"></span></label>
+      <label class="field"><span data-t="mo.dpi"></span> <input type="number" id="dpiIn" min="100" max="64000" step="50" style="width:90px"></label>
+      <p class="hint" id="motionState"></p>
+      <p class="hint" data-t="mo.hint"></p>
+    </section>
   </div>
 </main>
 
@@ -129,6 +138,7 @@
 import {
   Engine, Rate, render, cleanCrop, loadSettings, saveSettings, settingsToHash,
   tensionPercent, tiltSide, validRange, GLOW_START, orientFrame, mirrorRange,
+  MouseMeter, palmOf, MOTION_TRAIL_MS, CAMERA_LAG_MS,
 } from "./handlab.js";
 import { openSource, listCameras } from "./source.js";
 import { LANGS, setLang, getLang, t, applyI18n } from "./i18n.js";
@@ -158,6 +168,7 @@ function refreshTexts() {
   const auto = $("camSel").querySelector('option[value=""]');
   if (auto) auto.textContent = t("cam.auto");
   persist();
+  if (typeof motionTexts === "function") motionTexts();
 }
 for (const [code, name] of Object.entries(LANGS)) { const o = document.createElement("option"); o.value = code; o.textContent = name; $("langSel").append(o); }
 $("langSel").value = setLang(settings.lang);
@@ -284,6 +295,7 @@ async function start() {
   if (state.source.kind === "camera") refreshCameras();
   note("delegate", engine.delegate === "CPU" ? "note.cpu" : "");
   state.running = true;
+  motionTexts();
   persist();
   for (;;) {
     if (state.switchTo !== null) {  // カメラの切り替え
@@ -293,6 +305,8 @@ async function start() {
     }
     if (state.stop) {  // 「カメラを止める」：カメラを放して、最初の画面に戻る
       state.stop = false; state.running = false;
+      if (document.pointerLockElement) document.exitPointerLock();
+      motionTexts();
       state.source.stop(); state.source = null; state.angle = state.tension = null;
       $("cover").style.display = ""; $("stopBtn").style.display = "none"; $("startBtn").disabled = false;
       $("stCam").textContent = "—"; $("stAngle").textContent = "—";
@@ -311,8 +325,9 @@ async function start() {
     state.tension = state.angle != null && range ? tensionPercent(state.angle, range) : null;
     const side = state.tension != null ? tiltSide(res.points[0], res.forearm, state.tension) : null;
     $("stage").style.setProperty("--ar", frame.width / frame.height);
+    const motion = trackMotion(raw.t, res);
     // 操作画面では映像の全体を出す（OBS に映す範囲は、白い枠で示す）
-    render($("view"), frame.image, frame.width, frame.height, res, { skeleton: settings.skeleton, tension: state.tension, side });
+    render($("view"), frame.image, frame.width, frame.height, res, { skeleton: settings.skeleton, tension: state.tension, side, motion });
     showStatus(res);
     $("stCam").title = state.source.info();
     if (raw.release) raw.release();
@@ -320,6 +335,52 @@ async function start() {
 }
 $("startBtn").onclick = start;
 $("stopBtn").onclick = () => { state.stop = true; };
+
+/* ---------- 入力の色（試験機能） ----------
+   映像をクリックすると、このページがマウスを捕まえる（Esc で戻る）。捕まえている間だけ、マウスの動き（カウント）を読める。
+   ゲームの最中は別のアプリがマウスを使っているので読めない（ゲーム中に使うにはアプリ版が要る）。 */
+const meter = new MouseMeter();
+const motion = { trail: [], prevT: null };
+const local = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+const devInput = local && new URLSearchParams(location.search).has("frames");  // 開発用：捕まえなくても読む（自動の確認のため）
+const captured = () => document.pointerLockElement === $("stage") || devInput;
+const moveEvent = "onpointerrawupdate" in window ? "pointerrawupdate" : "pointermove";  // 使えれば、間引かれない方
+document.addEventListener(moveEvent, (e) => { if (settings.motion && captured()) meter.add(e.timeStamp, e.movementX, e.movementY); });
+$("stage").addEventListener("click", async () => {
+  if (!settings.motion || !state.running || $("stage").classList.contains("edit") || document.pointerLockElement) return;
+  try { await $("stage").requestPointerLock({ unadjustedMovement: true }); }  // OS の加速を通さない動き（使えるブラウザなら）
+  catch (e) { try { await $("stage").requestPointerLock(); } catch (e2) { /* 捕まえられなくても続ける */ } }
+});
+document.addEventListener("pointerlockchange", motionTexts);
+function motionTexts() {
+  $("motionState").textContent = !settings.motion ? "" : !state.running ? t("mo.needStart")
+    : captured() ? t("mo.locked") : t("mo.click");
+  $("stage").classList.toggle("grab", settings.motion && state.running && !captured());
+}
+/** 解析が終わったコマの、手の位置とマウスの速さを尾に足す。描く物（無ければ null）を返す。 */
+function trackMotion(frameT, res) {
+  if (!settings.motion || frameT == null) { motion.trail = []; motion.prevT = null; return null; }
+  const t1 = frameT - CAMERA_LAG_MS, t0 = motion.prevT;  // 映像の遅れの分だけ前のマウスの動きと合わせる
+  motion.prevT = t1;
+  if (t0 == null || t1 <= t0) return null;
+  const [dx, dy] = meter.sum(t0, t1);
+  const v = Math.hypot(dx, dy) * (2.54 / (settings.dpi || 1600)) / ((t1 - t0) / 1000);  // cm/秒
+  if (res && res.points) motion.trail.push({ t: frameT, ...palmOf(res.points), v });
+  motion.trail = motion.trail.filter((m) => frameT - m.t <= MOTION_TRAIL_MS);
+  return { trail: motion.trail, now: frameT };
+}
+$("motionOn").checked = !!settings.motion;
+$("dpiIn").value = settings.dpi || 1600;
+$("motionOn").onchange = (e) => {
+  settings.motion = e.target.checked;
+  if (!settings.motion && document.pointerLockElement) document.exitPointerLock();
+  persist(); motionTexts();
+};
+$("dpiIn").onchange = (e) => {
+  const v = Number(e.target.value);
+  settings.dpi = v >= 100 && v <= 64000 ? v : 1600;
+  e.target.value = settings.dpi; persist();
+};
 
 /* ---------- 可動域の測定：楽な構え（中立）→ 左右の限界まで往復（上限・下限） ---------- */
 const CALIB = { ready: 3, neutral: 2, sweep: 9 };  // 各段階の秒数

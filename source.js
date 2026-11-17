@@ -9,17 +9,18 @@ export async function cameraSource(label = "") {
   video.playsInline = true;
   video.srcObject = cam.stream;
   await video.play();
+  // コマが届いた時刻（performance.now() と同じ物差し）。入力の色（試験機能）でマウスの動きと合わせるのに使う
   const waitFrame = () => new Promise((resolve) => {
-    if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => resolve());
-    else requestAnimationFrame(() => resolve());
+    if (video.requestVideoFrameCallback) video.requestVideoFrameCallback((now) => resolve(now));
+    else requestAnimationFrame((now) => resolve(now));
   });
   return {
     kind: "camera",
     label: cam.label,
     info: () => `${video.videoWidth}×${video.videoHeight}${cam.fps ? ` / ${Math.round(cam.fps)}fps` : ""}`,
     async next() {
-      await waitFrame();
-      return { image: video, width: video.videoWidth, height: video.videoHeight };
+      const t = await waitFrame();
+      return { image: video, width: video.videoWidth, height: video.videoHeight, t };
     },
     stop() { cam.stream.getTracks().forEach((t) => t.stop()); },
   };
@@ -47,7 +48,7 @@ export function frameSource(base, count, fps = 30) {
       last = performance.now();
       const bmp = await createImageBitmap(await (await fetch(`${base}&i=${i}`)).blob());
       i = (i + 1) % count;
-      return { image: bmp, width: bmp.width, height: bmp.height, release: () => bmp.close() };
+      return { image: bmp, width: bmp.width, height: bmp.height, t: performance.now(), release: () => bmp.close() };
     },
     stop() {},
   };
